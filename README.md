@@ -1,7 +1,6 @@
 # Password-Manager
 Python Password Manager with GUI
 
-This was a project to learn the basics of GUI creation and encryption
-
-On Open you must load or generate a key that will encrypt the passwords entered
-You can then load the file that holds your passwords and get the passwords modify them or delete them
+On first run the password manager will prompt for a Master Password. This password
+will be used to access the program on future start ups. The program also generates 
+a key that it uses to encrypt all usernames and passwords for the entered programs.
