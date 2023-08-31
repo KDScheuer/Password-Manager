@@ -1,67 +1,63 @@
+import os.path
 import tkinter as tk
-from cryptography.fernet import Fernet
 from tkinter import Tk
+import hashlib
+from cryptography.fernet import Fernet
 
 
 class PasswordManager:
 
     def __init__(self):
         self.key = None
-        self.password_file = None
         self.password_dict = {}
 
-    def create_key(self, path):
+    def first_run(self, password):
+        """Generates a key, master key and password file"""
+        hashed = hashlib.sha512(password.encode()).hexdigest()
+        with open("auth.key", "w") as f:
+            f.write(str(hashed))
+
         self.key = Fernet.generate_key()
-        with open(path, 'wb') as f:
+        with open("key.key", 'wb') as f:
             f.write(self.key)
-        main()
-
-    def load_key(self, path):
-        with open(str(path), 'rb') as f:
-            self.key = f.read()
-        main()
-
-    def create_password_file(self, path):
-        self.password_file = path
-        with open(path, "w"):
+        with open("passwords.pass", "w"):
             pass
-        main()
 
-    def load_password_file(self, path):
-        self.password_file = path
+        main_menu()
 
-        with open(self.password_file, 'r') as f:
+    def load_key_and_passwords(self):
+        """Loads the created key and password file"""
+        with open("key.key", 'rb') as f:
+            self.key = f.read()
+
+        with open("passwords.pass", 'r') as f:
             for line in f:
                 site, encrypted_username, encrypted_password = line.split(":")
                 self.password_dict[site] = [Fernet(self.key).decrypt(encrypted_username.encode()).decode(),
                                             Fernet(self.key).decrypt(encrypted_password.encode()).decode()]
 
-        main()
-
     def add_password(self, site, username, password):
+        """Adds a Site, Username, and Password to the Password File"""
         self.password_dict[site] = [username, password]
-
-        if self.password_file is not None:
-            with open(self.password_file, 'a+') as f:
-                encrypted_username = Fernet(self.key).encrypt(username.encode())
-                encrypted_password = Fernet(self.key).encrypt(password.encode())
-                f.write(site + ":" + encrypted_username.decode() + ":" + encrypted_password.decode() + "\n")
-        main()
-
-    def get_password(self, site):
-        display_password(site, self.password_dict[site][0],  self.password_dict[site][1])
+        self.save_pass_dict()
+        main_menu()
 
     def delete_account(self, app):
+        """Deletes the Username and Password of the specified Site from the Password File"""
         self.password_dict = {site: value for (site, value) in self.password_dict.items() if site != app}
         self.save_pass_dict()
+        main_menu()
 
     def modify_account(self, app, username, password):
+        """Modifies the Username and Password of the specified Site"""
         self.password_dict = {site: value for (site, value) in self.password_dict.items() if site != app}
         self.password_dict[app] = [username, password]
         self.save_pass_dict()
+        main_menu()
 
     def save_pass_dict(self):
-        with open(self.password_file, 'w') as f:
+        """Saves the Password Dictionary to the Password File"""
+        with open("passwords.pass", 'w') as f:
             for key in self.password_dict:
                 site = key
                 username = self.password_dict[key][0]
@@ -69,191 +65,157 @@ class PasswordManager:
                 encrypted_username = Fernet(self.key).encrypt(username.encode())
                 encrypted_password = Fernet(self.key).encrypt(password.encode())
                 f.write(site + ":" + encrypted_username.decode() + ":" + encrypted_password.decode() + "\n")
-        main()
+        main_menu()
 
 
-class GUI:
+pm = PasswordManager()
+gui = Tk()
 
-    def __init__(self):
-        self.root = Tk()
-        self.root.geometry("400x300")
-        self.root.config(bg="white")
-        self.root.title("Password Manager")
 
-    def clearscreen(self):
-        for widget in self.root.winfo_children():
-            widget.destroy()
+def clearscreen():
+    for widget in gui.winfo_children():
+        widget.destroy()
+
+
+def add_account():
+    """Prompts for account name and passes results to modify function for username and password"""
+    clearscreen()
+    label = tk.Label(gui, text="Add Account", bg="gray", fg="black", width="400", font=("Ariel", 20))
+    account_frame = tk.Frame(gui, bg="lightblue")
+    account_label = tk.Label(account_frame, text="Account Name", bg="lightblue", fg="black", width=17)
+    account_entry = tk.Entry(account_frame, bg="lightgray", fg="black", width=25)
+    submit_btn = tk.Button(gui, text="Submit", command=lambda: modify_account(account_entry.get()))
+    menu_btn = tk.Button(gui, text="Main Menu", command=main_menu)
+
+    label.pack()
+    account_label.pack(side="left", padx=5)
+    account_entry.pack(side="right")
+    account_frame.pack(pady=20)
+    submit_btn.pack()
+    menu_btn.pack(pady=10)
+
+
+def modify_account(site):
+    """Prompts for new username and password for account"""
+    clearscreen()
+    label = tk.Label(gui, text=site, bg="gray", fg="black", width=400, font=("Ariel", 20))
+    user_frame = tk.Frame(gui, bg="lightblue")
+    user_label = tk.Label(user_frame, text="Username ", bg="lightblue", fg="black", width=15)
+    user_entry = tk.Entry(user_frame, bg="lightgray", fg="black", width=30)
+    pass_frame = tk.Frame(gui, bg="lightblue")
+    pass_label = tk.Label(pass_frame, text="Password ", bg="lightblue", fg="black", width=15)
+    pass_entry = tk.Entry(pass_frame, bg="lightgray", fg="black", width=30)
+    submit_btn = tk.Button(gui, text="Submit",
+                           command=lambda: pm.modify_account(site, user_entry.get(), pass_entry.get()))
+    menu_btn = tk.Button(gui, text="Main Menu", command=main_menu)
+
+    label.pack()
+    user_label.pack(side="left", padx=5)
+    user_entry.pack(side="right")
+    user_frame.pack(pady=10)
+    pass_label.pack(side="left", padx=5)
+    pass_entry.pack(side="right")
+    pass_frame.pack(pady=10)
+    submit_btn.pack(pady=10)
+    menu_btn.pack(pady=10)
+
+
+def account_info(site, username, password):
+    """Displays account info and prompts for modification / deletion of account"""
+    clearscreen()
+    label = tk.Label(gui, text=site, bg="gray", fg="black", width=400, font=("Ariel", 20))
+    user_label = tk.Label(gui, text=username, bg="lightblue", fg="black")
+    password_label = tk.Label(gui, text=password, bg="lightblue", fg="black")
+    btn_frame = tk.Frame(gui, bg="lightblue")
+    modify_btn = tk.Button(btn_frame, text="Modify", command=lambda: modify_account(site))
+    delete_btn = tk.Button(btn_frame, text="Delete", command=lambda: pm.delete_account(site))
+    menu_btn = tk.Button(gui, text="Main Menu", command=main_menu)
+
+    label.pack()
+    user_label.pack(pady=10)
+    password_label.pack(pady=10)
+    modify_btn.pack(side="right", padx=10)
+    delete_btn.pack(side="left")
+    btn_frame.pack(pady=20)
+    menu_btn.pack()
+
+
+def accounts():
+    """Displays List of all account in Password File"""
+    clearscreen()
+    label = tk.Label(gui, text="Accounts", width=400, bg="gray", fg="black", font=("Ariel", 20))
+    label.pack()
+
+    for key in pm.password_dict:
+        btn = tk.Button(gui, text=key, width=30, command=lambda key1=key: account_info(key1, pm.password_dict[key1][0],
+                                                                                       pm.password_dict[key1][1]))
+        btn.pack(pady=10)
+
+    menu_btn = tk.Button(gui, text="Main Menu", command=main_menu)
+    menu_btn.pack(pady=10)
 
 
 def main_menu():
-    gui.clearscreen()
-    gui.root.config(bg="lightblue")
-    label = tk.Label(gui.root, text="MAIN MENU", bg="gray", fg="black", font=("Ariel", 20), width=400)
-    btn1 = tk.Button(gui.root, text="Create or Load Keys", command=create_load_key_menu, width=30)
-    btn2 = tk.Button(gui.root, text="Create or load Password File", command=create_load_password_file, width=30)
-    btn3 = tk.Button(gui.root, text="Add a password", command=add_password, width=30)
-    btn4 = tk.Button(gui.root, text="Get a password", command=get_password, width=30)
-    btn5 = tk.Button(gui.root, text="Quit", command=quit_app, width=30)
+    """Displays the Main Menu"""
+    clearscreen()
+    label = tk.Label(gui, text="Main Menu", width=400, bg="gray", fg="black", font=("Ariel", 20))
+    btn1 = tk.Button(gui, text="Accounts", width=30, command=accounts)
+    btn2 = tk.Button(gui, text="Add Account", width=30, command=add_account)
+    btn3 = tk.Button(gui, text="Exit", width=30, command=exit)
 
     label.pack()
     btn1.pack(pady=10)
     btn2.pack(pady=10)
     btn3.pack(pady=10)
-    btn4.pack(pady=10)
-    btn5.pack(pady=10)
-    return
 
 
-def create_load_key_menu():
-    gui.clearscreen()
-    label = tk.Label(gui.root, text="Create or Load Key", width=400, bg="gray", fg="black", font=("Ariel", 20))
-    path_frame = tk.Frame(gui.root, bg="lightblue")
-    path_label = tk.Label(path_frame, text="Enter a Filename / Path", bg="lightblue", fg="black")
-    path = tk.Entry(path_frame, bg="lightgrey", fg="black")
-    btn_frame = tk.Frame(gui.root, bg="lightblue")
-    btn1 = tk.Button(btn_frame, text="Create Key", command=lambda: pm.create_key(path.get()))
-    btn2 = tk.Button(btn_frame, text="Load Key", command=lambda: pm.load_key(path.get()))
-    main_btn = tk.Button(gui.root, text="Return to Main Menu", command=main)
-
-    label.pack()
-    path_label.pack(side="left", padx=10)
-    path.pack(side="right")
-    path_frame.pack(pady=20)
-    btn1.pack(side="left", padx=10)
-    btn2.pack(side="right")
-    btn_frame.pack()
-    main_btn.pack(pady=70)
+def authenticate(password):
+    """Checks entered password SHA-256 hex digest with saved master password SHA-256 hex digest"""
+    hash_password = hashlib.sha512(password.encode()).hexdigest()
+    with open("auth.key", "r") as key:
+        key = key.read()
+        if hash_password == key:
+            pm.load_key_and_passwords()
+            main_menu()
+        else:
+            label = tk.Label(gui, text="Invalid Password", bg="red", fg="black")
+            label.pack()
 
 
-def create_load_password_file():
-    gui.clearscreen()
-    label = tk.Label(gui.root, text="Create or Load Password File", width=400, bg="gray", fg="black",
-                     font=("Ariel", 20))
-    path_frame = tk.Frame(gui.root, bg="lightblue")
-    path_label = tk.Label(path_frame, text="Enter a Filename / Path", bg="lightblue", fg="black")
-    path = tk.Entry(path_frame, bg="lightgrey", fg="black")
-    btn_frame = tk.Frame(gui.root, bg="lightblue")
-    btn1 = tk.Button(btn_frame, text="Create Password File", command=lambda: pm.create_password_file(path.get()))
-    btn2 = tk.Button(btn_frame, text="Load Password File", command=lambda: pm.load_password_file(path.get()))
-    main_btn = tk.Button(gui.root, text="Return to Main Menu", command=main)
+def set_master_password():
+    """Prompts for creation of master password"""
+    label = tk.Label(gui, text="Set the Master Password", width=400, bg="lightblue", fg="black", font=("Ariel", 20))
+    password = tk.Entry(gui, bg="lightgray", fg="black")
+    submit_button = tk.Button(gui, text="Submit", command=lambda: pm.first_run(password.get()))
 
-    label.pack()
-    path_label.pack(side="left")
-    path.pack(side="right")
-    path_frame.pack(pady=20)
-    btn1.pack(side="left", padx=10)
-    btn2.pack(side="right")
-    btn_frame.pack()
-    main_btn.pack(pady=60)
+    label.pack(pady=20)
+    password.pack(pady=10)
+    submit_button.pack(pady=10)
 
 
-def add_password():
-    gui.clearscreen()
-    label = tk.Label(gui.root, text="Add Account", width=400, bg="gray", fg="black", font=("Ariel", 20))
-    app_frame = tk.Frame(gui.root, bg="lightblue")
-    app_label = tk.Label(app_frame, text="Enter the Application", bg="lightblue", fg="black", width=17)
-    app = tk.Entry(app_frame, bg="lightgrey", fg="black", width=30)
+def login_screen():
+    """Displays a Login Screen"""
+    label = tk.Label(gui, text="Enter Password", width=400, bg="lightblue", fg="black", font=("Ariel", 20))
+    password = tk.Entry(gui, bg="lightgray", fg="black")
+    submit_button = tk.Button(gui, text="Submit", command=lambda: authenticate(password.get()))
 
-    username_frame = tk.Frame(gui.root, bg="lightblue")
-    username_label = tk.Label(username_frame, text="Enter the username", bg="lightblue", fg="black", width=17)
-    username = tk.Entry(username_frame, bg="lightgrey", fg="black", width=30)
-
-    password_frame = tk.Frame(gui.root, bg="lightblue")
-    password_label = tk.Label(password_frame, text="Enter the password", bg="lightblue", fg="black", width=17)
-    password = tk.Entry(password_frame, bg="lightgrey", fg="black", width=30)
-
-    btn = tk.Button(gui.root, text="Submit", command=lambda: pm.add_password(app.get(), username.get(), password.get()))
-    main_btn = tk.Button(gui.root, text="Return to Main Menu", command=main)
-
-    label.pack()
-    app_label.pack(side="left")
-    app.pack(side="right")
-    app_frame.pack(pady=15)
-    username_label.pack(side="left")
-    username.pack(side="right")
-    username_frame.pack(pady=10)
-    password_label.pack(side="left")
-    password.pack(side="right")
-    password_frame.pack()
-    btn.pack(pady=30)
-    main_btn.pack(pady=10)
-
-
-def get_password():
-    gui.clearscreen()
-    label = tk.Label(gui.root, text="Get Password", width=400, bg="gray", fg="black", font=("Ariel", 20))
-    label.pack()
-    for key in pm.password_dict:
-        btn = tk.Button(gui.root, text=key, width=30, command=lambda key1=key: pm.get_password(key1))
-        btn.pack(pady=10)
-
-
-def display_password(site, username, password):
-    gui.clearscreen()
-    label = tk.Label(gui.root, text=site, bg="gray", fg="black", width=400, font=("Ariel", 20))
-    user_nm_frame = tk.Frame(gui.root, bg="lightblue")
-    user_nm_label = tk.Label(user_nm_frame, text="Username: ", bg="lightblue", fg="black", width=17)
-    user_nm = tk.Label(user_nm_frame, text=username, bg="lightgray", fg="black", width=30)
-    passwd_frame = tk.Frame(gui.root, bg="lightblue")
-    passwd_label = tk.Label(passwd_frame, text="Password: ", bg="lightblue", fg="black", width=17)
-    passwd = tk.Label(passwd_frame, text=password, bg="lightgray", fg="black", width=30)
-    main_btn = tk.Button(gui.root, text="Return to Main Menu", command=main)
-    action_frame = tk.Frame(gui.root, background="lightblue")
-    delete_btn = tk.Button(action_frame, text="Delete Account", command=lambda: pm.delete_account(site))
-    modify_btn = tk.Button(action_frame, text="Modify Account", command=lambda: modify_account(site))
-
-    label.pack()
-    user_nm_label.pack(side="left")
-    user_nm.pack(side="right")
-    user_nm_frame.pack(pady=10)
-    passwd_label.pack(side="left")
-    passwd.pack(side="right")
-    passwd_frame.pack(pady=5)
-    delete_btn.pack(side="right", padx=5)
-    modify_btn.pack(side="left")
-    action_frame.pack(pady=10)
-    main_btn.pack(pady=15)
-
-
-def modify_account(site):
-    gui.clearscreen()
-    label = tk.Label(gui.root, text=site, font=("Ariel", 20))
-    username_frame = tk.Frame(gui.root, bg="lightblue")
-    username_label = tk.Label(username_frame, text="Enter the username", bg="lightblue", fg="black", width=17)
-    username = tk.Entry(username_frame, bg="lightgrey", fg="black", width=30)
-
-    password_frame = tk.Frame(gui.root, bg="lightblue")
-    password_label = tk.Label(password_frame, text="Enter the password", bg="lightblue", fg="black", width=17)
-    password = tk.Entry(password_frame, bg="lightgrey", fg="black", width=30)
-
-    btn = tk.Button(gui.root, text="Submit", command=lambda: pm.modify_account(site, username.get(), password.get()))
-    main_btn = tk.Button(gui.root, text="Return to Main Menu", command=main)
-
-    label.pack()
-    username_label.pack(side="left")
-    username.pack(side="right")
-    username_frame.pack(pady=10)
-    password_label.pack(side="left")
-    password.pack(side="right")
-    password_frame.pack()
-    btn.pack(pady=30)
-    main_btn.pack(pady=10)
-
-
-def quit_app():
-    exit(0)
-
-
-gui = GUI()
-pm = PasswordManager()
+    label.pack(pady=20)
+    password.pack(pady=10)
+    submit_button.pack(pady=10)
 
 
 def main():
-    done = False
-    if not done:
-        main_menu()
+    """Checks if this program has been executed before"""
+    gui.geometry("400x300")
+    gui.title("Password Manager")
+    gui.config(bg="lightblue")
 
-    gui.root.mainloop()
+    if os.path.isfile("auth.key"):
+        login_screen()
+    else:
+        set_master_password()
+
+    gui.mainloop()
 
 
 if __name__ == "__main__":
