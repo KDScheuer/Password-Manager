@@ -1,4 +1,4 @@
-#Password Manager
+# **Password Manager**
 
 This simple password manager application allows you to securely store and manage your account information with a master password. It uses encryption to protect your usernames and passwords.
 
